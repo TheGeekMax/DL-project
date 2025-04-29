@@ -1,10 +1,10 @@
 import os
 import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
-
 
 # train sur ce modèle
 # sauvegarde dans le dossier models
@@ -24,21 +24,51 @@ if __name__ == "__main__":
         --CNN -> create a CNN model
         --RNN-LSTM -> create a RNN model (LSTM)
         --RNN-GRU -> create a RNN model (GRU)
-        --MLP -> create a MLP model
+        --mlp -> create an MLP model
+        --dr X -> set dropout rate to X (for MLP only)
+        --l2_reg Y -> set L2 regularization to Y (for MLP only)
     """
     args = sys.argv[1:]
     model_type = None
+    mlp_dropout_rate = 0.5
+    mlp_l2_reg = 0.001
+
     if "--CNN" in args:
         model_type = "CNN"
     elif "--RNN-LSTM" in args:
         model_type = "RNN-LSTM"
     elif "--RNN-GRU" in args:
         model_type = "RNN-GRU"
-    elif "--MLP" in args:
-        model_type = "MLP"
+    elif "--mlp" in args:
+        model_type = "mlp"
     else:
-        print("Please specify a model type : --CNN, --RNN-LSTM, --RNN-GRU, --MLP")
+        print("Please specify a model type : --CNN, --RNN-LSTM, --RNN-GRU, --mlp")
         sys.exit(1)
+
+    def get_args(arg_name: str, default: str):
+        if arg_name in args:
+            index = args.index(arg_name)
+            if index + 1 < len(args):
+                return args[index + 1]
+        return default
+
+    mlp_dropout_rate = get_args("--dr", default=0.5)
+    mlp_l2_reg = get_args("--l2_reg", default=0.001)
+    try:
+        mlp_dropout_rate = float(mlp_dropout_rate)
+        mlp_l2_reg = float(mlp_l2_reg)
+    except ValueError:
+        print("ERROR : Dropout rate and L2 regularization must be float values")
+        sys.exit(1)
+    if mlp_dropout_rate < 0 or mlp_dropout_rate > 1:
+        print("ERROR : Dropout rate must be between 0 and 1")
+        sys.exit(1)
+    if mlp_l2_reg < 0:
+        print("ERROR : L2 regularization must be greater than 0")
+        sys.exit(1)
+    print(f"Model type : {model_type}")
+    print(f"Dropout rate : {mlp_dropout_rate}")
+    print(f"L2 regularization : {mlp_l2_reg}")
 
     # step 0 : create all the folders
     create_if_non_existant("models")
@@ -82,9 +112,13 @@ if __name__ == "__main__":
     elif model_type == "RNN-GRU":
         from src.models import create_rnn_model
         model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="gru")
-    elif model_type == "MLP":
+    elif model_type == "mlp":
         from src.models import create_mlp_model
-        model = create_mlp_model()
+        model = create_mlp_model(
+            input_shape=train_x.shape[1:],
+            dropout_rate=mlp_dropout_rate,
+            l2_reg=mlp_l2_reg
+        )
     else:
         print("ERROR : Model type not found")
         sys.exit(1)
