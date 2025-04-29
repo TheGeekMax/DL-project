@@ -1,0 +1,5 @@
+datasets/*
+models/*
+graphs/*
+**/__pycache__/*
+*.py[cod]
