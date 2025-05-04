@@ -8,6 +8,8 @@ import tensorflow as tf
 
 # train sur ce modèle
 # sauvegarde dans le dossier models
+from src.utils import get_args_float
+
 
 def create_if_non_existant(path : str):
     if not os.path.exists(path):
@@ -45,21 +47,8 @@ if __name__ == "__main__":
         print("Please specify a model type : --CNN, --RNN-LSTM, --RNN-GRU, --mlp")
         sys.exit(1)
 
-    def get_args(arg_name: str, default: str):
-        if arg_name in args:
-            index = args.index(arg_name)
-            if index + 1 < len(args):
-                return args[index + 1]
-        return default
-
-    mlp_dropout_rate = get_args("--dr", default=0.5)
-    mlp_l2_reg = get_args("--l2_reg", default=0.001)
-    try:
-        mlp_dropout_rate = float(mlp_dropout_rate)
-        mlp_l2_reg = float(mlp_l2_reg)
-    except ValueError:
-        print("ERROR : Dropout rate and L2 regularization must be float values")
-        sys.exit(1)
+    mlp_dropout_rate = get_args_float(args, "--dr", default=0.5)
+    mlp_l2_reg = get_args_float(args, "--l2_reg", default=0.001)
     if mlp_dropout_rate < 0 or mlp_dropout_rate > 1:
         print("ERROR : Dropout rate must be between 0 and 1")
         sys.exit(1)
