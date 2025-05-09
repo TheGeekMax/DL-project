@@ -59,7 +59,7 @@ def create_mlp_model(input_shape, dropout_rate=0.5, l2_reg=0.001):
     return model
 
 
-def create_cnn_model(input_shape, dropout_rate=0.1, l2_penalty=0.005):
+def create_cnn_model(input_shape, dropout_rate=0.5, l2_penalty=0.001):
     """
     Construction d'un modèle CNN adapté avec Flatten et nommage structuré des couches.
 
@@ -107,7 +107,7 @@ def create_cnn_model(input_shape, dropout_rate=0.1, l2_penalty=0.005):
     return model
 
 
-def create_rnn_model(input_shape, rnn_type="clasic", dropout_rate=0.7 , l2_reg=0.001):
+def create_rnn_model(input_shape, rnn_type="clasic", dropout_rate=0.5 , l2_reg=0.001):
     inputs = Input(shape=input_shape)
 
     # Première couche récurrente bidirectionnelle

@@ -53,6 +53,30 @@ if __name__ == "__main__":
     test_x = test_df.iloc[:,1:].values
     test_y = test_df.iloc[:,0].values
 
+    # step 2.1.1 : sort to have same count of 1 and 0 in the train set
+    train = (train_x, train_y)
+    train_0 = train[0][train[1] == 0]
+    train_1 = train[0][train[1] == 1]
+
+    # Find the smaller class size to ensure balance
+    count_0 = train_0.shape[0]
+    count_1 = train_1.shape[0]
+    balanced_count = min(count_0, count_1)
+
+    # Take equal numbers from each class
+    train_0 = train_0[:balanced_count]
+    train_1 = train_1[:balanced_count]
+
+    # Combine balanced datasets
+    train_x = np.concatenate((train_0, train_1), axis=0)
+    train_y = np.concatenate((np.zeros(balanced_count), np.ones(balanced_count)), axis=0)
+
+    # Shuffle the combined data
+    indices = np.arange(len(train_y))
+    np.random.shuffle(indices)
+    train_x = train_x[indices]
+    train_y = train_y[indices]
+
     # step 2.2 : reshape the data
     train_x = train_x.reshape((train_x.shape[0], train_x.shape[1], 1))
     test_x = test_x.reshape((test_x.shape[0], test_x.shape[1], 1))
