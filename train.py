@@ -4,40 +4,33 @@ import pandas as pd
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-# train sur ce modèle
-# sauvegarde dans le dossier models
-
-def create_if_non_existant(path : str):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-def download_dataset_if_non_existant(url : str, path : str):
-    if not os.path.exists(path):
-        os.system(f"wget {url} -O {path}")
+import requests as req
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from src.utils import create_if_non_existant, download_dataset_if_non_existant
+from src.graph_gen import generate_graphs_from_model
+from tensorflow.keras.utils import plot_model
 
 
 if __name__ == "__main__":
     ## step -1 : get the arguments
     """
         --CNN -> create a CNN model
-        --RNN-LSTM -> create a RNN model (LSTM)
-        --RNN-GRU -> create a RNN model (GRU)
+        --RNN-cla -> create a RNN model (clasic)
+        --RNN-bidir -> create a RNN model (bidirectional)
         --MLP -> create a MLP model
     """
     args = sys.argv[1:]
     model_type = None
     if "--CNN" in args:
         model_type = "CNN"
-    elif "--RNN-LSTM" in args:
-        model_type = "RNN-LSTM"
-    elif "--RNN-GRU" in args:
-        model_type = "RNN-GRU"
+    elif "--RNN-cla" in args:
+        model_type = "RNN-clasic"
+    elif "--RNN-bidir" in args:
+        model_type = "RNN-bidirectional"
     elif "--MLP" in args:
         model_type = "MLP"
     else:
-        print("Please specify a model type : --CNN, --RNN-LSTM, --RNN-GRU, --MLP")
+        print("Please specify a model type : --CNN, --RNN-cla, --RNN-bidir, --MLP")
         sys.exit(1)
 
     # step 0 : create all the folders
@@ -76,15 +69,15 @@ if __name__ == "__main__":
     if model_type == "CNN":
         from src.models import create_cnn_model
         model = create_cnn_model(input_shape=train_x.shape[1:])
-    elif model_type == "RNN-LSTM":
+    elif model_type == "RNN-clasic":
         from src.models import create_rnn_model
-        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="lstm")
-    elif model_type == "RNN-GRU":
+        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="clasic")
+    elif model_type == "RNN-bidirectional":
         from src.models import create_rnn_model
-        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="gru")
+        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="bidirectional")
     elif model_type == "MLP":
         from src.models import create_mlp_model
-        model = create_mlp_model()
+        model = create_mlp_model(input_shape=train_x.shape[1:])
     else:
         print("ERROR : Model type not found")
         sys.exit(1)
@@ -97,43 +90,16 @@ if __name__ == "__main__":
     )
 
     # step 5 : train the model
-    hystory = model.fit(train_x, train_y, epochs=1000, batch_size=256, validation_split=0.2, verbose=1)
+    hystory = model.fit(train_x, train_y, epochs=100, batch_size=256, verbose=1, validation_data=(test_x, test_y))
 
     # step 5.1 : generate the graphs
-    plt.plot(hystory.history["loss"], label="loss")
-    plt.plot(hystory.history["val_loss"], label="val_loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_loss.png")
+    y_pred = model.predict(test_x)
+    y_pred = np.where(y_pred > 0.5, 1, 0)
+    generate_graphs_from_model(hystory, model_type, test_x, test_y, y_pred)
 
-    plt.clf()
-    plt.plot(hystory.history["accuracy"], label="accuracy")
-    plt.plot(hystory.history["val_accuracy"], label="val_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_accuracy.png")
-
-    plt.clf()
-    plt.plot(hystory.history["loss"], label="loss")
-    plt.plot(hystory.history["val_loss"], label="val_loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_loss.png")
-    
-    plt.clf()
-    plt.plot(hystory.history["accuracy"], label="accuracy")
-    plt.plot(hystory.history["val_accuracy"], label="val_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_accuracy.png")
+    # step 5.2 : generate graph of different layers
+    # using plot_model
+    plot_model(model, to_file=f"graphs/{model_type}_model.png", show_shapes=True, show_layer_names=True)
 
     # step 6 : save the model
     model.save(f"models/{model_type}.h5")
