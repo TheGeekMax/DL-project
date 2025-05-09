@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import requests as req
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from src.utils import create_if_non_existant, download_dataset_if_non_existant
+from src.graph_gen import generate_graphs_from_model
+from tensorflow.keras.utils import plot_model
 
 # train sur ce modèle
 # sauvegarde dans le dossier models
@@ -24,8 +30,8 @@ if __name__ == "__main__":
     ## step -1 : get the arguments
     """
         --CNN -> create a CNN model
-        --RNN-LSTM -> create a RNN model (LSTM)
-        --RNN-GRU -> create a RNN model (GRU)
+        --RNN-cla -> create a RNN model (clasic)
+        --RNN-bidir -> create a RNN model (bidirectional)
         --mlp -> create an MLP model
         --dr X -> set dropout rate to X (for MLP only)
         --l2_reg Y -> set L2 regularization to Y (for MLP only)
@@ -37,10 +43,10 @@ if __name__ == "__main__":
 
     if "--CNN" in args:
         model_type = "CNN"
-    elif "--RNN-LSTM" in args:
-        model_type = "RNN-LSTM"
-    elif "--RNN-GRU" in args:
-        model_type = "RNN-GRU"
+    elif "--RNN-cla" in args:
+        model_type = "RNN-clasic"
+    elif "--RNN-bidir" in args:
+        model_type = "RNN-bidirectional"
     elif "--mlp" in args:
         model_type = "mlp"
     else:
@@ -49,12 +55,14 @@ if __name__ == "__main__":
 
     mlp_dropout_rate = get_args_float(args, "--dr", default=0.5)
     mlp_l2_reg = get_args_float(args, "--l2_reg", default=0.001)
+    
     if mlp_dropout_rate < 0 or mlp_dropout_rate > 1:
         print("ERROR : Dropout rate must be between 0 and 1")
         sys.exit(1)
     if mlp_l2_reg < 0:
         print("ERROR : L2 regularization must be greater than 0")
         sys.exit(1)
+    
     print(f"Model type : {model_type}")
     print(f"Dropout rate : {mlp_dropout_rate}")
     print(f"L2 regularization : {mlp_l2_reg}")
@@ -79,6 +87,30 @@ if __name__ == "__main__":
     test_x = test_df.iloc[:,1:].values
     test_y = test_df.iloc[:,0].values
 
+    # step 2.1.1 : sort to have same count of 1 and 0 in the train set
+    train = (train_x, train_y)
+    train_0 = train[0][train[1] == 0]
+    train_1 = train[0][train[1] == 1]
+
+    # Find the smaller class size to ensure balance
+    count_0 = train_0.shape[0]
+    count_1 = train_1.shape[0]
+    balanced_count = min(count_0, count_1)
+
+    # Take equal numbers from each class
+    train_0 = train_0[:balanced_count]
+    train_1 = train_1[:balanced_count]
+
+    # Combine balanced datasets
+    train_x = np.concatenate((train_0, train_1), axis=0)
+    train_y = np.concatenate((np.zeros(balanced_count), np.ones(balanced_count)), axis=0)
+
+    # Shuffle the combined data
+    indices = np.arange(len(train_y))
+    np.random.shuffle(indices)
+    train_x = train_x[indices]
+    train_y = train_y[indices]
+
     # step 2.2 : reshape the data
     train_x = train_x.reshape((train_x.shape[0], train_x.shape[1], 1))
     test_x = test_x.reshape((test_x.shape[0], test_x.shape[1], 1))
@@ -95,12 +127,12 @@ if __name__ == "__main__":
     if model_type == "CNN":
         from src.models import create_cnn_model
         model = create_cnn_model(input_shape=train_x.shape[1:])
-    elif model_type == "RNN-LSTM":
+    elif model_type == "RNN-clasic":
         from src.models import create_rnn_model
-        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="lstm")
-    elif model_type == "RNN-GRU":
+        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="clasic")
+    elif model_type == "RNN-bidirectional":
         from src.models import create_rnn_model
-        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="gru")
+        model = create_rnn_model(input_shape=train_x.shape[1:], rnn_type="bidirectional")
     elif model_type == "mlp":
         from src.models import create_mlp_model
         model = create_mlp_model(
@@ -120,43 +152,16 @@ if __name__ == "__main__":
     )
 
     # step 5 : train the model
-    hystory = model.fit(train_x, train_y, epochs=1000, batch_size=256, validation_split=0.2, verbose=1)
+    hystory = model.fit(train_x, train_y, epochs=100, batch_size=256, verbose=1, validation_data=(test_x, test_y))
 
     # step 5.1 : generate the graphs
-    plt.plot(hystory.history["loss"], label="loss")
-    plt.plot(hystory.history["val_loss"], label="val_loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_loss.png")
+    y_pred = model.predict(test_x)
+    y_pred = np.where(y_pred > 0.5, 1, 0)
+    generate_graphs_from_model(hystory, model_type, test_x, test_y, y_pred)
 
-    plt.clf()
-    plt.plot(hystory.history["accuracy"], label="accuracy")
-    plt.plot(hystory.history["val_accuracy"], label="val_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_accuracy.png")
-
-    plt.clf()
-    plt.plot(hystory.history["loss"], label="loss")
-    plt.plot(hystory.history["val_loss"], label="val_loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_loss.png")
-    
-    plt.clf()
-    plt.plot(hystory.history["accuracy"], label="accuracy")
-    plt.plot(hystory.history["val_accuracy"], label="val_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.legend()
-    plt.savefig(f"graphs/{model_type}_accuracy.png")
+    # step 5.2 : generate graph of different layers
+    # using plot_model
+    plot_model(model, to_file=f"graphs/{model_type}_model.png", show_shapes=True, show_layer_names=True)
 
     # step 6 : save the model
     model.save(f"models/{model_type}.h5")

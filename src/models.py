@@ -10,6 +10,7 @@ from tensorflow.keras.layers import (
     Dense,
     Dropout,
     Flatten,
+    Activation,
     GlobalAveragePooling1D,
     Input,
     MaxPooling1D,
@@ -62,176 +63,72 @@ def create_mlp_model(input_shape, dropout_rate=0.5, l2_reg=0.001):
     return model
 
 
-def create_cnn_model(input_shape, dropout_rate=0.5, l2_reg=0.001):
+def create_cnn_model(input_shape, dropout_rate=0.5, l2_penalty=0.001):
     """
-    Crée un modèle Convolutional Neural Network (CNN) avec l'API fonctionnelle de Keras.
+    Construction d'un modèle CNN adapté avec Flatten et nommage structuré des couches.
 
     Args:
-        input_shape: Forme des données d'entrée (nombre de points temporels, canaux)
-        dropout_rate: Taux de dropout pour la régularisation
-        l2_reg: Facteur de régularisation L2
+        input_shape: Forme des entrées (timesteps, channels)
+        dropout_rate: Taux de dropout
+        l2_penalty: Coefficient de régularisation L2
 
     Returns:
         model: Modèle CNN compilé
     """
-    # Couche d'entree
-    inputs = Input(shape=input_shape)
+    input_layer = Input(shape=input_shape)
 
-    # 1er bloc convolutionnel
-    x = Conv1D(
-        filters=64,
-        kernel_size=8,
-        activation="relu",
-        padding="same",
-        kernel_regularizer=l2(l2_reg),
-    )(inputs)
-    x = BatchNormalization()(x)
-    x = MaxPooling1D(pool_size=2)(x)
-    x = Dropout(dropout_rate)(x)
+    # Bloc 1
+    conv_layer_1 = Conv1D(128, kernel_size=7, padding='same', kernel_regularizer=l2(l2_penalty))(input_layer)
+    batchnorm_layer_1 = BatchNormalization()(conv_layer_1)
+    activation_layer_1 = Activation('relu')(batchnorm_layer_1)
+    pooling_layer_1 = MaxPooling1D(pool_size=2)(activation_layer_1)
+    dropout_layer_1 = Dropout(rate=dropout_rate * 0.5)(pooling_layer_1)
 
-    # 2eme bloc convolutionnel
-    x = Conv1D(
-        filters=128,
-        kernel_size=5,
-        activation="relu",
-        padding="same",
-        kernel_regularizer=l2(l2_reg),
-    )(x)
-    x = BatchNormalization()(x)
-    x = MaxPooling1D(pool_size=2)(x)
-    x = Dropout(dropout_rate)(x)
+    # Bloc 2
+    conv_layer_2 = Conv1D(256, kernel_size=5, padding='same', kernel_regularizer=l2(l2_penalty))(dropout_layer_1)
+    batchnorm_layer_2 = BatchNormalization()(conv_layer_2)
+    activation_layer_2 = Activation('relu')(batchnorm_layer_2)
+    pooling_layer_2 = MaxPooling1D(pool_size=2)(activation_layer_2)
+    dropout_layer_2 = Dropout(rate=dropout_rate * 0.6)(pooling_layer_2)
 
-    # 3eme bloc convolutionnel
-    x = Conv1D(
-        filters=256,
-        kernel_size=3,
-        activation="relu",
-        padding="same",
-        kernel_regularizer=l2(l2_reg),
-    )(x)
-    x = BatchNormalization()(x)
-    x = GlobalAveragePooling1D()(x)
-    x = Dropout(dropout_rate)(x)
+    # Bloc 3
+    conv_layer_3 = Conv1D(512, kernel_size=3, padding='same', kernel_regularizer=l2(l2_penalty))(dropout_layer_2)
+    batchnorm_layer_3 = BatchNormalization()(conv_layer_3)
+    activation_layer_3 = Activation('relu')(batchnorm_layer_3)
+    pooling_layer_3 = MaxPooling1D(pool_size=2)(activation_layer_3)
+    dropout_layer_3 = Dropout(rate=dropout_rate * 0.7)(pooling_layer_3)
 
-    # Couche dense
-    x = Dense(64, activation="relu", kernel_regularizer=l2(l2_reg))(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
+    # Flatten + Dense
+    flatten_layer = Flatten()(dropout_layer_3)
+    dense_layer_1 = Dense(256, activation='relu', kernel_regularizer=l2(l2_penalty))(flatten_layer)
+    dropout_layer_4 = Dropout(rate=dropout_rate)(dense_layer_1)
 
-    # Couche de sortie (classification binaire)
-    outputs = Dense(1, activation="sigmoid")(x)
+    output_layer = Dense(1, activation='sigmoid')(dropout_layer_4)
 
-    # Creation du model
-    model = Model(inputs=inputs, outputs=outputs, name="CNN_Model")
+    model = Model(inputs=input_layer, outputs=output_layer, name="Custom_CNN_Flatten")
 
     return model
 
 
-def create_rnn_model(input_shape, rnn_type="lstm", dropout_rate=0.5, l2_reg=0.001):
-    """
-    Crée un modèle Recurrent Neural Network (RNN) avec l'API fonctionnelle de Keras.
-
-    Args:
-        input_shape: Forme des données d'entrée (nombre de points temporels, features)
-        rnn_type: Type de RNN ('lstm' ou 'gru')
-        dropout_rate: Taux de dropout pour la régularisation
-        l2_reg: Facteur de régularisation L2
-
-    Returns:
-        model: Modèle RNN compilé
-    """
-    # Couche d'entrée
+def create_rnn_model(input_shape, rnn_type="clasic", dropout_rate=0.5 , l2_reg=0.001):
     inputs = Input(shape=input_shape)
 
     # Première couche récurrente bidirectionnelle
-    if rnn_type.lower() == "lstm":
-        x = Bidirectional(
-            LSTM(64, return_sequences=True, kernel_regularizer=l2(l2_reg))
-        )(inputs)
-    else:  # GRU
-        x = Bidirectional(
-            GRU(64, return_sequences=True, kernel_regularizer=l2(l2_reg))
-        )(inputs)
+    if rnn_type.lower() == "clasic":
+        lstm_layer1 = LSTM(64, return_sequences=True, kernel_regularizer=l2(l2_reg))(inputs)
+        dropout_layer1 = Dropout(dropout_rate)(lstm_layer1)
+        lstm_layer2 = LSTM(32, return_sequences=False, kernel_regularizer=l2(l2_reg))(dropout_layer1)
+        dropout_layer2 = Dropout(dropout_rate)(lstm_layer2)
+    else:
+        lstm_layer1 = Bidirectional(LSTM(64, return_sequences=True, kernel_regularizer=l2(l2_reg)))(inputs)
+        dropout_layer1 = Dropout(dropout_rate)(lstm_layer1)
+        lstm_layer2 = Bidirectional(LSTM(32, return_sequences=False, kernel_regularizer=l2(l2_reg)))(dropout_layer1)
+        dropout_layer2 = Dropout(dropout_rate)(lstm_layer2)
 
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-
-    # Deuxième couche récurrente
-    if rnn_type.lower() == "lstm":
-        x = LSTM(128, kernel_regularizer=l2(l2_reg))(x)
-    else:  # GRU
-        x = GRU(128, kernel_regularizer=l2(l2_reg))(x)
-
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-
-    # Couche dense
-    x = Dense(64, activation="relu", kernel_regularizer=l2(l2_reg))(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
-
-    # Couche de sortie (classification binaire)
-    outputs = Dense(1, activation="sigmoid")(x)
+    outputs = Dense(1, activation="sigmoid")(dropout_layer2)
 
     # Création du modèle
-    model_name = "LSTM_Model" if rnn_type.lower() == "lstm" else "GRU_Model"
+    model_name = "RNN_Clasic" if rnn_type.lower() == "clasic" else "RNN_Bidirectional"
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
     return model
-
-
-def compile_model(model, optimizer="adam", learning_rate=0.001):
-    """
-    Compile le modèle avec les paramètres spécifiés.
-
-    Args:
-        model: Modèle Keras à compiler
-        optimizer: Optimiseur à utiliser
-        learning_rate: Taux d'apprentissage
-
-    Returns:
-        model: Modèle compilé
-    """
-    if optimizer.lower() == "adam":
-        opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    elif optimizer.lower() == "rmsprop":
-        opt = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-    elif optimizer.lower() == "sgd":
-        opt = tf.keras.optimizers.SGD(learning_rate=learning_rate)
-    else:
-        opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-    model.compile(
-        optimizer=opt,
-        loss="binary_crossentropy",
-        metrics=[
-            "accuracy",
-            tf.keras.metrics.Precision(name="precision"),
-            tf.keras.metrics.Recall(name="recall"),
-            tf.keras.metrics.AUC(name="auc"),
-        ],
-    )
-
-    return model
-
-
-def count_parameters(model):
-    """
-    Compte le nombre de paramètres dans un modèle.
-
-    Args:
-        model: Modèle Keras
-
-    Returns:
-        total_params: Nombre total de paramètres
-        trainable_params: Nombre de paramètres entraînables
-        non_trainable_params: Nombre de paramètres non entraînables
-    """
-    import numpy as np
-
-    # Version corrigée utilisant .shape au lieu de .get_shape()
-    trainable_params = sum(np.prod(v.shape) for v in model.trainable_weights)
-    non_trainable_params = sum(np.prod(v.shape) for v in model.non_trainable_weights)
-    total_params = trainable_params + non_trainable_params
-
-    return total_params, trainable_params, non_trainable_params
