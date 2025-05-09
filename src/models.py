@@ -1,23 +1,22 @@
+import numpy as np
+import tensorflow
 import tensorflow as tf
-from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (
-    Input,
+    GRU,
+    LSTM,
+    BatchNormalization,
+    Bidirectional,
+    Conv1D,
     Dense,
     Dropout,
-    BatchNormalization,
-    Conv1D,
-    MaxPooling1D,
-    GlobalAveragePooling1D,
-    LSTM,
-    GRU,
-    Bidirectional,
     Flatten,
     Activation,
+    GlobalAveragePooling1D,
+    Input,
+    MaxPooling1D,
 )
+from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
-import tensorflow
-
-import numpy as np
 
 
 def create_mlp_model(input_shape, dropout_rate=0.5, l2_reg=0.001):
@@ -32,29 +31,34 @@ def create_mlp_model(input_shape, dropout_rate=0.5, l2_reg=0.001):
     Returns:
         model: Modèle MLP compilé
     """
+    seq_len = input_shape[0]
+
     # Couche d'entrée
-    inputs = Input(shape=input_shape)
+    input_layer = Input(shape=(seq_len,))
 
     # Première couche cachée
-    x = Dense(256, activation="relu", kernel_regularizer=l2(l2_reg))(inputs)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
+    dense_layer1 = Dense(256, activation="relu",
+                         kernel_regularizer=l2(l2_reg))(input_layer)
+    BatchNormalization_layer1 = BatchNormalization()(dense_layer1)
+    Dropout_layer1 = Dropout(dropout_rate)(BatchNormalization_layer1)
 
     # Deuxième couche cachée
-    x = Dense(128, activation="relu", kernel_regularizer=l2(l2_reg))(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
+    dense_layer2 = Dense(128, activation="relu",
+                         kernel_regularizer=l2(l2_reg))(Dropout_layer1)
+    BatchNormalization_layer2 = BatchNormalization()(dense_layer2)
+    Dropout_layer2 = Dropout(dropout_rate)(BatchNormalization_layer2)
 
     # Troisième couche cachée
-    x = Dense(64, activation="relu", kernel_regularizer=l2(l2_reg))(x)
-    x = BatchNormalization()(x)
-    x = Dropout(dropout_rate)(x)
+    dense_layer3 = Dense(64, activation="relu",
+                         kernel_regularizer=l2(l2_reg))(Dropout_layer2)
+    BatchNormalization_layer3 = BatchNormalization()(dense_layer3)
+    Dropout_layer3 = Dropout(dropout_rate)(BatchNormalization_layer3)
 
-    # Couche de sortie (classification binaire)
-    outputs = Dense(1, activation="sigmoid")(x)
+    # Couche de sortie
+    output_layer = Dense(1, activation="sigmoid")(Dropout_layer3)
 
     # Création du modèle
-    model = Model(inputs=inputs, outputs=outputs, name="MLP_Model")
+    model = Model(input_layer, output_layer, name="MLP_Model")
 
     return model
 
@@ -71,7 +75,6 @@ def create_cnn_model(input_shape, dropout_rate=0.5, l2_penalty=0.001):
     Returns:
         model: Modèle CNN compilé
     """
-
     input_layer = Input(shape=input_shape)
 
     # Bloc 1
