@@ -41,20 +41,23 @@ if __name__ == "__main__":
     mlp_dropout_rate = 0.5
     mlp_l2_reg = 0.001
 
-    if "--CNN" in args:
+    if "--cnn" in args:
         model_type = "CNN"
-    elif "--RNN-cla" in args:
+    elif "--rnn-cla" in args:
         model_type = "RNN-clasic"
-    elif "--RNN-bidir" in args:
+    elif "--rnn-bidir" in args:
         model_type = "RNN-bidirectional"
     elif "--mlp" in args:
         model_type = "mlp"
+        mlp_dropout_rate = get_args_float(args, "--dr", default=0.5)
+        mlp_l2_reg = get_args_float(args, "--l2_reg", default=0.001)
+        print(f"Dropout rate : {mlp_dropout_rate}")
+        print(f"L2 regularization : {mlp_l2_reg}")
     else:
-        print("Please specify a model type : --CNN, --RNN-LSTM, --RNN-GRU, --mlp")
+        print("Please specify a model type : --cnn, --rnn-cla, --rnn-bidirectional, --mlp")
         sys.exit(1)
 
-    mlp_dropout_rate = get_args_float(args, "--dr", default=0.5)
-    mlp_l2_reg = get_args_float(args, "--l2_reg", default=0.001)
+    
     
     if mlp_dropout_rate < 0 or mlp_dropout_rate > 1:
         print("ERROR : Dropout rate must be between 0 and 1")
@@ -63,9 +66,7 @@ if __name__ == "__main__":
         print("ERROR : L2 regularization must be greater than 0")
         sys.exit(1)
     
-    print(f"Model type : {model_type}")
-    print(f"Dropout rate : {mlp_dropout_rate}")
-    print(f"L2 regularization : {mlp_l2_reg}")
+    
 
     # step 0 : create all the folders
     create_if_non_existant("models")
